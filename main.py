@@ -7,6 +7,7 @@ def main():
     cloudendure_url = "https://console.cloudendure.com/api/latest"
     cloudendure_project_id = "projects/d5aed277-b6fb-4c6c-bedf-bb52799c99f2"
 
+    # TODO: update
     test_blueprint_id = "f320947e-1555-4cee-9128-58a6cc4dd99c"
 
     # Init HTTP Client Session
@@ -18,10 +19,14 @@ def main():
 
     authenticate(client, cloudendure_url, api_key)
     blueprint_config = get_blueprint(client, cloudendure_url, cloudendure_project_id, test_blueprint_id)
-
     print(blueprint_config)
 
-    get_security_group_by_name(ec2_client, "private_alb_windows")
+    # Get SecurityGroup ID from Name
+    # get_security_group_by_name(ec2_client, "private_alb_windows")
+    security_group_id = get_security_group_id(ec2_client, "sftp-sg")
+    print("security group id:", security_group_id)
+
+    subnet_id = get_subnet_id(ec2_client, "test-subnet")
 
 def authenticate(client, cloudendure_url, api_key):
     login_url = cloudendure_url + "/login"
@@ -43,7 +48,7 @@ def get_blueprint(client, cloudendure_url, cloudendure_project_id, cloudendure_b
     blueprint_config = resp.json()
     return blueprint_config
 
-def get_security_group_by_name(ec2_client, security_group_name):
+def get_security_group_id(ec2_client, security_group_name):
     try:
         response = ec2_client.describe_security_groups(
             Filters=[
@@ -54,13 +59,23 @@ def get_security_group_by_name(ec2_client, security_group_name):
     except ClientError as e:
         print(e)
 
-    # return security_groups
+    return response['SecurityGroups'][0]['GroupId']
 
-def get_vpcs(ec2_client):
-    response = ec2_client.describe_vpcs()
-    # TODO: test by name instead of ID
-    vpc_id = response.get('Vpcs', [{}])[0].get('VpcId', '')
+def get_subnet_id(ec2_client, subnet_name):
+    subnets = ec2_client.describe_subnets()
 
+    for subnet in subnets['Subnets']:
+        # TODO: test with a name of existing subnet
+        # if subnet['Name'] == subnet_name:
+            # subnet_id = subnet['SubnetId']
+        print(subnet['SubnetId'], "\n")
+
+    subnet_id = "temp"
+    # TODO: add error handling
+    # if subnet_id:
+        # return error
+
+    return subnet_id
 
 if __name__ == "__main__":
     main()
