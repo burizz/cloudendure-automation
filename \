@@ -66,6 +66,9 @@ def authenticate(http_client, cloudendure_url, api_key):
     http_client.headers.update({'X-XSRF-TOKEN': xsrf_token})
 
 def get_blueprint(http_client, blueprint_url):
+
+    print(blueprint_url)
+
     resp = http_client.get(url = blueprint_url)
 
     blueprint_config = resp.json()
@@ -75,7 +78,8 @@ def get_blueprint(http_client, blueprint_url):
 def update_blueprint(http_client, blueprint_url, machine_id, change_config):
     # if change_config_values == "securityGroupIDs":
     list_of_sgs = []
-    for key, value in change_config.items():
+    for key, value in change_values.items():
+        print(change_config_values[key])
         list_of_sgs.append(value)
 
     updated_config_values = {
@@ -86,9 +90,11 @@ def update_blueprint(http_client, blueprint_url, machine_id, change_config):
     json_config_map = json.dumps(updated_config_values, indent=4)
     print(json_config_map)
 
-    resp = http_client.patch(url = blueprint_url, data=json_config_map)
+    resp = http_client.patch(url = blueprint_url, json=json_config_map)
     print(resp)
-    print(resp.content)
+    # resp = http_client.patch(url = blueprint_url, json={
+        # "machineId": machine_id,
+    # })
 
 def get_security_group_id(ec2_client, security_group_name):
     try:
