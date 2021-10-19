@@ -3,9 +3,9 @@ import requests, boto3, json
 from botocore.exceptions import ClientError
 
 # TODO: configurable input params
-
 def main():
     api_key = "6F1A-C693-6F14-0E7C-F296-C4BE-5CF5-269A-017E-D864-B9D1-2BD6-5693-6A0F-622D-E7E2"
+
     cloudendure_url = "https://console.cloudendure.com/api/latest"
     cloudendure_project_id = "projects/d5aed277-b6fb-4c6c-bedf-bb52799c99f2"
     # TODO: update to make it configurable
@@ -20,7 +20,7 @@ def main():
 
     # security_group_name = "private_alb_windows"
     security_group_name = "sftp-sg"
-    subnet_name = "test-subnet"
+    subnet_name = "eduspire-terraform-subnet-1-private"
 
     # Get SecurityGroup ID from Name
     security_group_id = get_security_group_id(ec2_client, security_group_name)
@@ -33,6 +33,16 @@ def main():
     # authenticate in cloudendure
     authenticate(http_client, cloudendure_url, api_key)
 
+    # TODO: Get project name as input param
+    projects_config = list_projects(http_client, cloudendure_url)
+    # project_name = "ecint-non-prod"
+    for project in projects_config['items'].items():
+        print(project)
+    # TODO: List all projects and find project ID that matches the name
+
+    # TODO: List all machines and get their IDs
+    # TODO: Go through all machines and take SG and Subnet from eu-west-1 and update the same ones in the blueprint
+
     # build blueprint api url 
     blueprint_url = cloudendure_url + "/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
 
@@ -44,6 +54,7 @@ def main():
 
     # TODO: Build a list of Security Groups from eu-west-1 and make sure the same ones are defined in blueprintconfig
     # prepare key/value pairs of configs to be updated
+    change_config = "securityGroupIDs"
     security_groups = {
         'private_db_ecint': 'sg-0244a14e569eaba68',
         'private_active_directory_client': 'sg-3247085f',
@@ -51,8 +62,28 @@ def main():
         'console': 'sg-d64807bb',
         }
 
-    # udpate blueprint
-    update_blueprint(http_client, blueprint_url, machine_id, security_groups)
+    # TODO: test with case switches - seems to be supported only by python3.10
+    # match change_config:
+        # case "securityGroupIDs":
+            # update_blueprint(http_client, blueprint_url, machine_id, change_config, security_groups)
+        # case _:
+            # print("incorrect config value")
+
+# Security Group case
+    if change_config == "securityGroupIDs":
+        update_blueprint(http_client, blueprint_url, machine_id, change_config, security_groups)
+        # udpate blueprint
+
+    change_config = "subnetIDs"
+    subnets = {
+        'private_subnet1': 'subnet-00741c4d',
+        # 'private_subnet2': 'subnet-b70e54dc',
+        }
+
+    # Subnet case
+    if change_config == "subnetIDs":
+        # udpate blueprint
+        update_blueprint(http_client, blueprint_url, machine_id, change_config, subnets)
 
 
 def authenticate(http_client, cloudendure_url, api_key):
@@ -65,6 +96,14 @@ def authenticate(http_client, cloudendure_url, api_key):
     xsrf_token = http_client.cookies['XSRF-TOKEN']
     http_client.headers.update({'X-XSRF-TOKEN': xsrf_token})
 
+def list_projects(http_client, cloudendure_url):
+    projects_url = cloudendure_url + "/projects"
+    resp = http_client.get(url = projects_url)
+
+    project_list = resp.json()
+    print(project_list)
+    return project_list
+
 def get_blueprint(http_client, blueprint_url):
     resp = http_client.get(url = blueprint_url)
 
@@ -72,15 +111,44 @@ def get_blueprint(http_client, blueprint_url):
     return blueprint_config
 
 # TODO: make this a variadic function
-def update_blueprint(http_client, blueprint_url, machine_id, change_config):
-    # if change_config_values == "securityGroupIDs":
-    list_of_sgs = []
-    for key, value in change_config.items():
-        list_of_sgs.append(value)
+# def update_blueprint(http_client, blueprint_url, machine_id, change_config, change_values):
+    # # Security Group case
+    # if change_config == "security_groups":
+        # list_of_sgs = []
+        # for key, value in change_values.items():
+            # list_of_sgs.append(value)
+
+        # updated_config_values = {
+            # "machineId": machine_id,
+            # "securityGroupIDs": list_of_sgs,
+            # }
+
+    # # Subnet case
+    # if change_config == "subnet":
+        # list_of_subnets = []
+        # for key, value in change_values.items():
+            # list_of_subnets.append(value)
+
+        # updated_config_values = {
+            # "machineId": machine_id,
+            # "subnetIDs": list_of_subnets,
+            # }
+
+    # json_config_map = json.dumps(updated_config_values, indent=4)
+    # print(json_config_map)
+
+    # resp = http_client.patch(url = blueprint_url, data=json_config_map)
+    # print(resp)
+    # print(resp.content)
+
+def update_blueprint(http_client, blueprint_url, machine_id, change_config, change_values):
+    list_of_changes = []
+    for key, value in change_values.items():
+        list_of_changes.append(value)
 
     updated_config_values = {
         "machineId": machine_id,
-        "securityGroupIDs": list_of_sgs,
+        change_config: list_of_changes,
         }
 
     json_config_map = json.dumps(updated_config_values, indent=4)
@@ -92,16 +160,16 @@ def update_blueprint(http_client, blueprint_url, machine_id, change_config):
 
 def get_security_group_id(ec2_client, security_group_name):
     try:
-        response = ec2_client.describe_security_groups(
+        resp = ec2_client.describe_security_groups(
             Filters=[
                 dict(Name='group-name', Values=[security_group_name])
             ]
         )
-        print(response)
+        print(resp)
     except ClientError as e:
         print(e)
 
-    return response['SecurityGroups'][0]['GroupId']
+    return resp['SecurityGroups'][0]['GroupId']
 
 def get_subnet_id(ec2_client, subnet_name):
     subnets = ec2_client.describe_subnets()
@@ -111,6 +179,8 @@ def get_subnet_id(ec2_client, subnet_name):
         # if subnet['Name'] == subnet_name:
             # subnet_id = subnet['SubnetId']
         print(subnet['SubnetId'], "\n")
+        # TODO: figure out how to match subnet by tag
+        # print(subnet['Tags'], "\n")
 
     # TODO: finish this
     subnet_id = "temp"
