@@ -18,7 +18,7 @@ def main():
     # Init EC2 Client
     ec2_client = boto3.client('ec2')
 
-    # security_group_name = "private_alb_windows"
+    # TODO: replace with hardcoded values with values from get_sg and get_subnet functins
     security_group_name = "sftp-sg"
     subnet_name = "eduspire-terraform-subnet-1-private"
 
@@ -30,24 +30,23 @@ def main():
     subnet_id = get_subnet_id(ec2_client, subnet_name)
     print("subnet id:", subnet_id)
 
-    # authenticate in cloudendure
+    # Authenticate in cloudendure
     authenticate(http_client, cloudendure_url, api_key)
 
-    # TODO: Get project name as input param
-    projects_config = list_projects(http_client, cloudendure_url)
-    # project_name = "ecint-non-prod"
-    for project in projects_config['items'].items():
-        print(project)
-    # TODO: List all projects and find project ID that matches the name
+    # Get list of project names and their IDs
+    project_json_configs = list_projects(http_client, cloudendure_url)
+    projects = {}
+    for project in project_json_configs['items']:
+        proj_name = project['name']
+        proj_id = project['id']
+        projects[proj_name] = proj_id
+        print(projects)
 
     # TODO: List all machines and get their IDs
     # TODO: Go through all machines and take SG and Subnet from eu-west-1 and update the same ones in the blueprint
 
-    # build blueprint api url 
-    blueprint_url = cloudendure_url + "/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
-
     # get blueprint config json
-    blueprint_config = get_blueprint(http_client, blueprint_url)
+    blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id)
 
     # get machine id from blueprint config
     machine_id = blueprint_config['machineId']
@@ -71,7 +70,7 @@ def main():
 
 # Security Group case
     if change_config == "securityGroupIDs":
-        update_blueprint(http_client, blueprint_url, machine_id, change_config, security_groups)
+        update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, security_groups)
         # udpate blueprint
 
     change_config = "subnetIDs"
@@ -83,7 +82,7 @@ def main():
     # Subnet case
     if change_config == "subnetIDs":
         # udpate blueprint
-        update_blueprint(http_client, blueprint_url, machine_id, change_config, subnets)
+        update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, subnets)
 
 
 def authenticate(http_client, cloudendure_url, api_key):
@@ -97,14 +96,24 @@ def authenticate(http_client, cloudendure_url, api_key):
     http_client.headers.update({'X-XSRF-TOKEN': xsrf_token})
 
 def list_projects(http_client, cloudendure_url):
+    # Get Projects definition and return as JSON
     projects_url = cloudendure_url + "/projects"
     resp = http_client.get(url = projects_url)
 
     project_list = resp.json()
-    print(project_list)
     return project_list
 
-def get_blueprint(http_client, blueprint_url):
+def list_machines(http_client, cloudendure_url, cloudendure_project_id):
+    machines_url = cloudendure_url + "/" + cloudendure_project_id + "/machines"
+    resp = http_client.get(url = machines_url)
+
+    machine_list = resp.json()
+    return machine_list
+
+def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id):
+    blueprint_url = cloudendure_url + "/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
+
+    # Get Blueprint definition and return as JSON
     resp = http_client.get(url = blueprint_url)
 
     blueprint_config = resp.json()
@@ -141,7 +150,8 @@ def get_blueprint(http_client, blueprint_url):
     # print(resp)
     # print(resp.content)
 
-def update_blueprint(http_client, blueprint_url, machine_id, change_config, change_values):
+def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, change_values):
+    blueprint_url = cloudendure_url + "/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
     list_of_changes = []
     for key, value in change_values.items():
         list_of_changes.append(value)
