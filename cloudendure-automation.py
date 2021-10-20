@@ -4,17 +4,12 @@ from botocore.exceptions import ClientError
 from argparse import ArgumentParser
 
 def main():
-    # TODO: input param project name i.e. - ecint-non-prod
-    # TODO: List all projects and get their IDs
-    # TODO: List all machines and get their IDs
     # TODO: Go through all machines and take SG and Subnet from eu-west-1 and update the same ones in the blueprint
     # TODO: Build a list of Security Groups and Subnets from eu-west-1 and make sure the same ones are set in blueprint
-
-    # Get AWS Account Name from 
+    # Get AWS account name from input param
     parser = ArgumentParser()
     parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
     input_args = parser.parse_args()
-    print(input_args.accountName)
 
     # Init HTTP Client Session
     http_client = requests.Session()
@@ -26,10 +21,45 @@ def main():
     # Main API URL
     cloudendure_url = "https://console.cloudendure.com/api/latest"
 
-    # TODO: get from project list 
-    cloudendure_project_id = "projects/d5aed277-b6fb-4c6c-bedf-bb52799c99f2"
-    # TODO: get from machine
+    # Authenticate in Cloudendure
+    api_key = "6F1A-C693-6F14-0E7C-F296-C4BE-5CF5-269A-017E-D864-B9D1-2BD6-5693-6A0F-622D-E7E2"
+    authenticate(http_client, cloudendure_url, api_key)
+
+    # Get list of project names and their IDs
+    project_json_configs = list_projects(http_client, cloudendure_url)
+    # projects = {}
+    for project in project_json_configs['items']:
+        project_name = project['name']
+        project_id = project['id']
+        # projects[project_name] = project_id
+        if project_name == input_args.accountName:
+            cloudendure_project_id = project_id
+
+    # TODO: get blueprint id 
     cloudendure_blueprint_id = "f320947e-1555-4cee-9128-58a6cc4dd99c"
+
+    # Get list of machine objects in each project
+    machines = {}
+    # for project, project_id in projects.items():
+    machine_json_configs = list_machines(http_client, cloudendure_url, project_id)
+    for machine in machine_json_configs['items']:
+        print(machine)
+        # machine_name = machine['name']
+        machine_id = machine['id']
+        # ec2_id = machine['machineCloudId']
+        # print(machine_name)
+        print("machine id:", machine_id)
+        # print(ec2_id)
+        # items 
+            # "id":"700628b3-64aa-41c5-a751-e7ed7f4ad8c2",
+            # "machineCloudId":"i-05ac151fba79cd429",
+            # "name":"00434-qa-eu-west-1-be-investment-list-dist-db",
+
+    # get blueprint config json
+    blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id)
+
+    # get machine id from blueprint config
+    machine_id = blueprint_config['machineId']
 
     # Get SecurityGroup ID from Name
     # TODO: take name from current SG assigned to EC2 instance
@@ -42,40 +72,6 @@ def main():
     subnet_name = "eduspire-terraform-subnet-1-private"
     subnet_id = get_subnet_id(ec2_client, subnet_name)
     print("subnet id:", subnet_id)
-
-    # Authenticate in Cloudendure
-    api_key = "6F1A-C693-6F14-0E7C-F296-C4BE-5CF5-269A-017E-D864-B9D1-2BD6-5693-6A0F-622D-E7E2"
-    authenticate(http_client, cloudendure_url, api_key)
-
-    # Get list of project names and their IDs
-    project_json_configs = list_projects(http_client, cloudendure_url)
-    projects = {}
-    for project in project_json_configs['items']:
-        project_name = project['name']
-        project_id = project['id']
-        projects[project_name] = project_id
-
-    # Get list of machine objects in each project
-    machines = {}
-    for project, project_id in projects.items():
-        machine_json_configs = list_machines(http_client, cloudendure_url, project_id)
-        for machine in machine_json_configs['items']:
-            # machine_name = machine['name']
-            machine_id = machine['id']
-            # ec2_id = machine['machineCloudId']
-            # print(machine_name)
-            print("machine id:", machine_id)
-            # print(ec2_id)
-        # items 
-            # "id":"700628b3-64aa-41c5-a751-e7ed7f4ad8c2",
-            # "machineCloudId":"i-05ac151fba79cd429",
-            # "name":"00434-qa-eu-west-1-be-investment-list-dist-db",
-
-    # get blueprint config json
-    blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id)
-
-    # get machine id from blueprint config
-    machine_id = blueprint_config['machineId']
 
     # prepare key/value pairs of configs to be updated
     change_config = "securityGroupIDs"
@@ -132,7 +128,7 @@ def list_machines(http_client, cloudendure_url, cloudendure_project_id):
     return machine_list
 
 def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id):
-    blueprint_url = cloudendure_url + "/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
+    blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
 
     # Get Blueprint definition and return as JSON
     resp = http_client.get(url = blueprint_url)
@@ -145,7 +141,7 @@ def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudend
     return blueprint_config
 
 def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, change_values):
-    blueprint_url = cloudendure_url + "/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
+    blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
     list_of_changes = []
     for key, value in change_values.items():
         list_of_changes.append(value)
