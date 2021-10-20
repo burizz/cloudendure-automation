@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import requests, boto3, json, sys
 from botocore.exceptions import ClientError
+from argparse import ArgumentParser
 
 def main():
     # TODO: input param project name i.e. - ecint-non-prod
@@ -8,6 +9,12 @@ def main():
     # TODO: List all machines and get their IDs
     # TODO: Go through all machines and take SG and Subnet from eu-west-1 and update the same ones in the blueprint
     # TODO: Build a list of Security Groups and Subnets from eu-west-1 and make sure the same ones are set in blueprint
+
+    # Get AWS Account Name from 
+    parser = ArgumentParser()
+    parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
+    input_args = parser.parse_args()
+    print(input_args.accountName)
 
     # Init HTTP Client Session
     http_client = requests.Session()
