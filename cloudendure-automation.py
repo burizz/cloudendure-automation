@@ -27,7 +27,6 @@ def main():
 
     # Get list of project names and their IDs
     project_json_configs = list_projects(http_client, cloudendure_url)
-    # projects = {}
     for project in project_json_configs['items']:
         project_name = project['name']
         project_id = project['id']
@@ -35,25 +34,18 @@ def main():
         if project_name == input_args.accountName:
             cloudendure_project_id = project_id
 
-    # TODO: get blueprint id 
+    # TODO: find blueprint id from machine ?
     cloudendure_blueprint_id = "f320947e-1555-4cee-9128-58a6cc4dd99c"
 
     # Get list of machine objects in each project
-    machines = {}
-    # for project, project_id in projects.items():
     machine_json_configs = list_machines(http_client, cloudendure_url, project_id)
     for machine in machine_json_configs['items']:
-        print(machine)
-        # machine_name = machine['name']
-        machine_id = machine['id']
-        # ec2_id = machine['machineCloudId']
-        # print(machine_name)
-        print("machine id:", machine_id)
-        # print(ec2_id)
-        # items 
-            # "id":"700628b3-64aa-41c5-a751-e7ed7f4ad8c2",
-            # "machineCloudId":"i-05ac151fba79cd429",
-            # "name":"00434-qa-eu-west-1-be-investment-list-dist-db",
+        source_ec2_name = machine['sourceProperties']['name']
+        source_ec2_id = machine['sourceProperties']['machineCloudId']
+        cloudendure_machine_id = machine['id']
+        print("source ec2 name:", source_ec2_name)
+        print("source ec2 id:", source_ec2_id)
+        print("cloudendure machine id:", cloudendure_machine_id)
 
     # get blueprint config json
     blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id)
@@ -63,15 +55,16 @@ def main():
 
     # Get SecurityGroup ID from Name
     # TODO: take name from current SG assigned to EC2 instance
-    security_group_name = "sftp-sg"
-    security_group_id = get_security_group_id(ec2_client, security_group_name)
-    print("security group id:", security_group_id)
+    # security_group_name = "sftp-sg"
+    security_group_ids = get_ec2_instance_sgs(ec2_client, source_ec2_id)
+    for security_group_id in security_group_ids:
+        print("security group id:", security_group_id)
 
     # Get SubnetID from Name
     # TODO: take subnet name(tag) from current subnet of EC2 instance
-    subnet_name = "eduspire-terraform-subnet-1-private"
-    subnet_id = get_subnet_id(ec2_client, subnet_name)
-    print("subnet id:", subnet_id)
+    # subnet_name = "eduspire-terraform-subnet-1-private"
+    # subnet_id = get_subnet(ec2_client, subnet_name)
+    # print("subnet id:", subnet_id)
 
     # prepare key/value pairs of configs to be updated
     change_config = "securityGroupIDs"
@@ -158,20 +151,24 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
     if resp.status_code != 200:
         raise Exception('Unable to update blueprint, response code:', resp.status_code, resp.reason)
 
-def get_security_group_id(ec2_client, security_group_name):
+def get_ec2_instance_sgs(ec2_client, ec2_id):
     try:
-        resp = ec2_client.describe_security_groups(
+        # TODO: add better error handling when instance id doesn't match
+        resp = ec2_client.describe_instances(
             Filters=[
-                dict(Name='group-name', Values=[security_group_name])
+                # dict(Name='instance-id', Values=[ec2_id])
+                dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
             ]
         )
-        # print(resp)
-    except ClientError as e:
-        print(e)
+    except ClientError as err:
+        print(err)
 
-    return resp['SecurityGroups'][0]['GroupId']
+    return resp['Reservations'][0]['Instances'][0]['SecurityGroups']
 
-def get_subnet_id(ec2_client, subnet_name):
+def get_ec2_instance_subnet(ec2_client, ec2_id):
+    pass
+
+def get_subnet(ec2_client, subnet_name):
     try:
         subnets = ec2_client.describe_subnets()
     except ClientError as e:
