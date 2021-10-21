@@ -4,8 +4,8 @@ from botocore.exceptions import ClientError
 from argparse import ArgumentParser
 
 def main():
-    # TODO: Go through all machines and take SG and Subnet from eu-west-1 and update the same ones in the blueprint
     # TODO: Build a list of Security Groups and Subnets from eu-west-1 and make sure the same ones are set in blueprint
+    # TODO: better erorr handling on HTTP requests - use raise_for_status()
     # Get AWS account name from input param
     parser = ArgumentParser()
     parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
@@ -43,45 +43,29 @@ def main():
         source_ec2_name = machine['sourceProperties']['name']
         source_ec2_id = machine['sourceProperties']['machineCloudId']
         cloudendure_machine_id = machine['id']
-        print("source ec2 name:", source_ec2_name)
-        print("source ec2 id:", source_ec2_id)
-        print("cloudendure machine id:", cloudendure_machine_id)
+        # print("source ec2 name:", source_ec2_name)
+        # print("source ec2 id:", source_ec2_id)
+        # print("cloudendure machine id:", cloudendure_machine_id)
 
-    # get blueprint config json
+    # Get blueprint config json
     blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id)
 
-    # get machine id from blueprint config
+    # Get machine id from blueprint config
     machine_id = blueprint_config['machineId']
 
-    # Get SecurityGroup ID from Name
-    # TODO: take name from current SG assigned to EC2 instance
-    # security_group_name = "sftp-sg"
-    security_group_ids = get_ec2_instance_sgs(ec2_client, source_ec2_id)
-    for security_group_id in security_group_ids:
-        print("security group id:", security_group_id)
-
-    # Get SubnetID from Name
-    # TODO: take subnet name(tag) from current subnet of EC2 instance
-    # subnet_name = "eduspire-terraform-subnet-1-private"
-    # subnet_id = get_subnet(ec2_client, subnet_name)
-    # print("subnet id:", subnet_id)
-
-    # prepare key/value pairs of configs to be updated
+    # Get security groups from source EC2 
+    sg_map = get_ec2_instance_sgs(ec2_client, source_ec2_id)
     change_config = "securityGroupIDs"
-    security_groups = {
-        'private_db_ecint': 'sg-0244a14e569eaba68',
-        'private_active_directory_client': 'sg-3247085f',
-        'private_db': 'sg-c54906a8',
-        'console': 'sg-d64807bb'
-        }
+    security_groups = {}
+    for security_group in sg_map:
+        sg_name = security_group['GroupName']
+        sg_id = security_group['GroupId']
+        security_groups[sg_name] = sg_id
 
-    # change_config = "subnetIDs"
-    # subnets = {
-        # 'private_subnet1': 'subnet-00741c4d',
-        # # 'private_subnet2': 'subnet-b70e54dc',
-        # }
+    # Update blueprint's security groups 
+    update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, security_groups)
 
-    # Security Group case
+    # Update blueprint's subnet
     update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, security_groups)
 
 def authenticate(http_client, cloudendure_url, api_key):
@@ -163,7 +147,9 @@ def get_ec2_instance_sgs(ec2_client, ec2_id):
     except ClientError as err:
         print(err)
 
-    return resp['Reservations'][0]['Instances'][0]['SecurityGroups']
+    security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
+
+    return security_group_map
 
 def get_ec2_instance_subnet(ec2_client, ec2_id):
     pass
