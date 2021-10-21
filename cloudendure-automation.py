@@ -62,11 +62,18 @@ def main():
         sg_id = security_group['GroupId']
         security_groups[sg_name] = sg_id
 
+    security_groups = {
+        'private_db_ecint': 'sg-0244a14e569eaba68',
+        'private_active_directory_client': 'sg-3247085f',
+        'private_db': 'sg-c54906a8',
+        'console': 'sg-d64807bb'
+        }
+
     # Update blueprint's security groups 
     update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, security_groups)
 
-    # Update blueprint's subnet
-    update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, security_groups)
+    # # TODO: Update blueprint's subnet
+    # update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, security_groups)
 
 def authenticate(http_client, cloudendure_url, api_key):
     login_url = cloudendure_url + "/login"
@@ -144,21 +151,18 @@ def get_ec2_instance_sgs(ec2_client, ec2_id):
                 dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
             ]
         )
-    except ClientError as err:
-        print(err)
+    except ClientError as describeInstancesErr:
+        print(describeInstancesErr)
 
     security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
 
     return security_group_map
 
-def get_ec2_instance_subnet(ec2_client, ec2_id):
-    pass
-
-def get_subnet(ec2_client, subnet_name):
+def get_ec2_subnet(ec2_client, ec2_id):
     try:
         subnets = ec2_client.describe_subnets()
-    except ClientError as e:
-        print(e)
+    except ClientError as describeSubnetsErr:
+        print(describeSubnetsErr)
 
     # for subnet in subnets['Subnets']:
         # TODO: test with a name of existing subnet
