@@ -54,10 +54,9 @@ def main():
         source_ec2_name = machine['sourceProperties']['name']
         source_ec2_id = machine['sourceProperties']['machineCloudId']
 
-        # Get security groups from source EC2
+        # Get security groups and subnet from source EC2
         print(f'Get Security Groups from instance {source_ec2_name} / {source_ec2_id}')
-        sg_map = get_ec2_instance_sgs(ec2_client, source_ec2_id)
-        change_config = "securityGroupIDs"
+        sg_map, subnet = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id)
         security_groups = {}
         for security_group in sg_map:
             sg_name = security_group['GroupName']
@@ -73,6 +72,7 @@ def main():
                 # SG
                 print(f'Updating Security Groups in Blueprint with ID: {cloudendure_machine_id}')
                 # TODO: temp hardcoded values until tested in internal network
+                change_config = "securityGroupIDs"
                 security_groups = {
                     'private_db_ecint': 'sg-0244a14e569eaba68',
                     'private_active_directory_client': 'sg-3247085f',
@@ -81,14 +81,12 @@ def main():
                     }
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, security_groups)
 
-                # TODO: test and fix subnets
                 # Subnets
                 # TODO: temp hardcoded values until tested in internal network
-                # subnet = {
-                    # "test_subnet": "subnet-00741c4d"
-                # }
-                # print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
-                # update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnet)
+                change_config = "subnet"
+                subnet = "subnet-00741c4d"
+                print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
+                update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnet)
 
                 # TODO: print blueprint json after update in case of debug flag 
                 #print(get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id))
@@ -157,14 +155,27 @@ def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudend
 
 def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, change_values):
     blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
-    list_of_changes = []
-    for key, value in change_values.items():
-        list_of_changes.append(value)
 
-    updated_config_values = {
-        "machineId": machine_id,
-        change_config: list_of_changes,
+    if change_config == "SecurityGroups":
+        list_of_changes = []
+        for key, value in change_values.items():
+            list_of_changes.append(value)
+
+        updated_config_values = {
+            "machineId": machine_id,
+            change_config: list_of_changes,
+            }
+
+    # TODO: fix this
+    elif change_config == "Subnet":
+        updated_config_values = {
+            "machineId": machine_id,
+            change_config: "",
         }
+
+    else:
+        # TODO: change this to an exception
+        print(f'change_config value not provided to update_blueprint() function')
 
     json_config_map = json.dumps(updated_config_values, indent=4)
 
@@ -178,38 +189,23 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
         print(f'Update blueprint {cloudendure_blueprint_id} - status {resp.status_code} {resp.reason}')
 
 # TODO: Refactor to both get the security groups and subnet
-def get_ec2_instance_sgs(ec2_client, ec2_id):
+def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id):
     try:
         # TODO: add better error handling when instance id doesn't match
         resp = ec2_client.describe_instances(
             Filters=[
-                dict(Name='instance-id', Values=[ec2_id])
+                # # TODO: uncomment once tested
+                # dict(Name='instance-id', Values=[ec2_id])
+                dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
             ]
         )
     except ClientError as describeInstancesErr:
         print(describeInstancesErr)
 
     security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
-    subnet = resp['Reservations'][0]['Instances'][0]['Subnet']
-    print(f'Subnet: {subnet}')
+    subnet = resp['Reservations'][0]['Instances'][0]['SubnetId']
 
     return security_group_map, subnet
 
-# def get_ec2_subnet(ec2_client, ec2_id):
-    # try:
-        # # TODO: add better error handling when instance id doesn't match
-        # resp = ec2_client.describe_instances(
-            # Filters=[
-                # # TODO: uncomment once tested
-                # # dict(Name='instance-id', Values=[ec2_id])
-                # dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
-            # ]
-        # )
-    # except ClientError as describeInstancesErr:
-        # print(describeInstancesErr)
-
-    # security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
-
-    # return security_group_map
 if __name__ == "__main__":
     main()
