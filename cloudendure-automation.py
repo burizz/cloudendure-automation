@@ -177,43 +177,39 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
     else:
         print(f'Update blueprint {cloudendure_blueprint_id} - status {resp.status_code} {resp.reason}')
 
+# TODO: Refactor to both get the security groups and subnet
 def get_ec2_instance_sgs(ec2_client, ec2_id):
     try:
         # TODO: add better error handling when instance id doesn't match
         resp = ec2_client.describe_instances(
             Filters=[
-                # dict(Name='instance-id', Values=[ec2_id])
-                dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
+                dict(Name='instance-id', Values=[ec2_id])
             ]
         )
     except ClientError as describeInstancesErr:
         print(describeInstancesErr)
 
     security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
+    subnet = resp['Reservations'][0]['Instances'][0]['Subnet']
+    print(f'Subnet: {subnet}')
 
-    return security_group_map
+    return security_group_map, subnet
 
-def get_ec2_subnet(ec2_client, ec2_id):
-    try:
-        subnets = ec2_client.describe_subnets()
-    except ClientError as describeSubnetsErr:
-        print(describeSubnetsErr)
+# def get_ec2_subnet(ec2_client, ec2_id):
+    # try:
+        # # TODO: add better error handling when instance id doesn't match
+        # resp = ec2_client.describe_instances(
+            # Filters=[
+                # # TODO: uncomment once tested
+                # # dict(Name='instance-id', Values=[ec2_id])
+                # dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
+            # ]
+        # )
+    # except ClientError as describeInstancesErr:
+        # print(describeInstancesErr)
 
-    # for subnet in subnets['Subnets']:
-        # TODO: test with a name of existing subnet
-        # if subnet['Name'] == subnet_name:
-            # subnet_id = subnet['SubnetId']
-        # print(subnet['SubnetId'], "\n")
-        # TODO: figure out how to match subnet by tag
-        # print(subnet['Tags'], "\n")
+    # security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
 
-    # TODO: finish this
-    subnet_id = "temp"
-    # TODO: add error handling
-    # if subnet_id:
-        # return error
-
-    return subnet_id
-
+    # return security_group_map
 if __name__ == "__main__":
     main()
