@@ -7,6 +7,7 @@ def main():
     # Get AWS account name from input param
     parser = ArgumentParser()
     parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
+    parser.add_argument("--apiKey", help="Provide Cloudendure authentication API Key")
     input_args = parser.parse_args()
 
     # Init HTTP Client Session
@@ -21,7 +22,11 @@ def main():
     print(f'Cloudendure API URL set to {cloudendure_url}')
 
     # Authenticate in Cloudendure
-    api_key = "6F1A-C693-6F14-0E7C-F296-C4BE-5CF5-269A-017E-D864-B9D1-2BD6-5693-6A0F-622D-E7E2"
+    if input_args.apiKey:
+        api_key = input_args.apiKey
+    else:
+        api_key = "6F1A-C693-6F14-0E7C-F296-C4BE-5CF5-269A-017E-D864-B9D1-2BD6-5693-6A0F-622D-E7E2"
+
     authenticate(http_client, cloudendure_url, api_key)
 
     # Get project ID
