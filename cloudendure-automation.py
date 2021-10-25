@@ -183,15 +183,15 @@ def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id):
     # Find EC2 instance by ID and get its security groups and subnet
 
     # Validate that provided instance is running
-    response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
-    # response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
+    # response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
+    response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
     if response['InstanceStatuses'][0]['InstanceState']['Name'] == 'running':
         try:
             # Get ec2 instance object
             resp = ec2_client.describe_instances(
                 Filters=[
-                    dict(Name='instance-id', Values=[ec2_id])
-                    # dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
+                    # dict(Name='instance-id', Values=[ec2_id])
+                    dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
                 ]
             )
         except ClientError as describeInstancesErr:
