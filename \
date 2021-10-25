@@ -3,6 +3,8 @@ import requests, boto3, json, sys
 from botocore.exceptions import ClientError
 from argparse import ArgumentParser
 
+# TODO: better erorr handling on HTTP requests - use raise_for_status()
+# TODO: implement debug logging option
 def main():
     # Get AWS account name from input param
     parser = ArgumentParser()
@@ -54,7 +56,7 @@ def main():
 
         # Get security groups and subnet from source EC2
         print(f'Get Security Groups from instance {source_ec2_name} / {source_ec2_id}')
-        sg_map, subnets = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id)
+        sg_map, subnet = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id)
         security_groups = {}
         for security_group in sg_map:
             sg_name = security_group['GroupName']
@@ -90,28 +92,31 @@ def main():
                 print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnets)
 
-                blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id)
-                print(f'Blueprint updated to:  {blueprint_config}')
+                # TODO: print blueprint json after update in case of debug flag 
+                #print(get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id))
 
 def authenticate(http_client, cloudendure_url, api_key):
-    # Login to Cloudendure and get Cookie and XSRF token
     login_url = cloudendure_url + "/login"
 
+    # Login to get Cookie and XSRF token
     resp = http_client.post(url = login_url, json={"userApiToken": api_key})
-    resp.raise_for_status()
+
+    if resp.status_code != 200:
+        raise Exception('Unable to authenticate to cloudendure, response code:', resp.status_code, resp.reason)
 
     # Set XSRF Token header for HTTP Session
     xsrf_token = http_client.cookies['XSRF-TOKEN']
     http_client.headers.update({'X-XSRF-TOKEN': xsrf_token})
-    print('Authenticated to cloudendure successfully')
 
 def list_projects(http_client, cloudendure_url):
     # Get Projects definition and return as JSON
     projects_url = cloudendure_url + "/projects"
     resp = http_client.get(url = projects_url)
-    resp.raise_for_status()
 
     project_list = resp.json()
+
+    if resp.status_code != 200:
+        raise Exception('Unable to get list of projects, response code:', resp.status_code, resp.reason)
 
     return project_list
 
@@ -119,9 +124,11 @@ def list_machines(http_client, cloudendure_url, cloudendure_project_id):
     # Get Machines definition and return as JSON
     machines_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/machines"
     resp = http_client.get(url = machines_url)
-    resp.raise_for_status()
 
     machine_list = resp.json()
+
+    if resp.status_code != 200:
+        raise Exception('Unable to get list of machines, response code:', resp.status_code, resp.reason)
 
     return machine_list
 
@@ -129,38 +136,48 @@ def list_blueprints(http_client, cloudendure_url, cloudendure_project_id):
     # Get Projects definition and return as JSON
     blueprints_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints"
     resp = http_client.get(url = blueprints_url)
-    resp.raise_for_status()
 
     blueprint_list = resp.json()
+
+    if resp.status_code != 200:
+        raise Exception('Unable to get list of projects, response code:', resp.status_code, resp.reason)
 
     return blueprint_list
 
 def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id):
-    # Get Blueprint definition and return as JSON
     blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
 
+    # Get Blueprint definition and return as JSON
     resp = http_client.get(url = blueprint_url)
-    resp.raise_for_status()
 
     blueprint_config = resp.json()
+
+    if resp.status_code != 200:
+        raise Exception('Unable to get blueprint, response code:', resp.status_code, resp.reason)
 
     return blueprint_config
 
 def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, change_values):
-    # Update Cloudendure blueprint - currently supports update of securityGroupIDs and subnetIDs
     blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
 
     list_of_changes = []
 
-    if change_config == "securityGroupIDs":
+    if change_config == "SecurityGroups":
         for key, value in change_values.items():
             list_of_changes.append(value)
+
+        # updated_config_values = {
+            # "machineId": machine_id,
+            # change_config: list_of_changes,
+            # }
 
     elif change_config == "subnetIDs":
         for key, value in change_values.items():
             list_of_changes.append(value)
+
     else:
-        raise ValueError(f'Update Blueprint Error: change_config value not provided or incorrect')
+        # TODO: change this to an exception
+        print(f'change_config value not provided to update_blueprint() function')
 
     updated_config_values = {
         "machineId": machine_id,
@@ -170,37 +187,32 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
     json_config_map = json.dumps(updated_config_values, indent=4)
 
     resp = http_client.patch(url = blueprint_url, data=json_config_map)
-    resp.raise_for_status()
 
-    print(f'Update blueprint {cloudendure_blueprint_id} - status {resp.status_code} {resp.reason}')
+    if resp.status_code != 200:
+        raise Exception('Unable to update blueprint, response code:', resp.status_code, resp.reason)
+        # TODO: switch this to HTTPError
+        # raise Exception('Unable to update blueprint, response code:', resp.status_code, resp.reason)
+    else:
+        print(f'Update blueprint {cloudendure_blueprint_id} - status {resp.status_code} {resp.reason}')
 
+# TODO: Refactor to both get the security groups and subnet
 def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id):
-    # Find EC2 instance by ID and get its security groups and subnet
+    try:
+        # TODO: add better error handling when instance id doesn't match
+        resp = ec2_client.describe_instances(
+            Filters=[
+                # # TODO: uncomment once tested
+                # dict(Name='instance-id', Values=[ec2_id])
+                dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
+            ]
+        )
+    except ClientError as describeInstancesErr:
+        print(describeInstancesErr)
 
-    # Validate that provided instance is running
-    response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
-    # response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
-    if response['InstanceStatuses'][0]['InstanceState']['Name'] == 'running':
-        try:
-            # Get ec2 instance object
-            resp = ec2_client.describe_instances(
-                Filters=[
-                    dict(Name='instance-id', Values=[ec2_id])
-                    # dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
-                ]
-            )
-        except ClientError as describeInstancesErr:
-            print(describeInstancesErr)
-
-    # Get Security group name and ids
     security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
-
-    # Get Subnet name and id
-    subnets = {}
     subnet = resp['Reservations'][0]['Instances'][0]['SubnetId']
-    subnets['private-subnet'] = subnet
 
-    return security_group_map, subnets
+    return security_group_map, subnet
 
 if __name__ == "__main__":
     main()
