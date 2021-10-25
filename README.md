@@ -1,6 +1,6 @@
 # cloudendure-automation
 
-Cloudendure automation in Python
+Cloudendure automation (tested on Python 3.8.10)
 
 Take AWS account name argument: --accountName (required)
 Take Cloudendure API Key argument: --apiKey (optional)
