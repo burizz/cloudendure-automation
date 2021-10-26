@@ -8,25 +8,36 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
     parser.add_argument("--apiKey", help="Provide Cloudendure authentication API Key")
+    parser.add_argument("--awsRegion", help="Provide AWS Region. If not provided defaults to eu-central-1")
+    parser.add_argument("--awsProfile", help="Provide AWS Profile name. If not provided looks for credentials in environment variables")
     input_args = parser.parse_args()
 
     # Init HTTP Client Session
     http_client = requests.Session()
     http_client.headers.update({'content-type': 'application/json'})
 
+    # Configure AWS Region
+    if input_args.awsRegion:
+        aws_region = input_args.awsRegion
+    else:
+        aws_region = "eu-central-1"
+
     # Init EC2 Client
-    ec2_client = boto3.client('ec2')
+    if input_args.awsProfile:
+        boto3.setup_default_session(profile_name=input_args.awsProfile)
+    ec2_client = boto3.client('ec2', region_name=aws_region)
 
     # Main Cloudendure API URL
     cloudendure_url = "https://console.cloudendure.com/api/latest"
     print(f'Cloudendure API URL set to {cloudendure_url}')
 
-    # Authenticate in Cloudendure
+    # Configure Cloudendure API Key
     if input_args.apiKey:
         api_key = input_args.apiKey
     else:
         api_key = "6F1A-C693-6F14-0E7C-F296-C4BE-5CF5-269A-017E-D864-B9D1-2BD6-5693-6A0F-622D-E7E2"
 
+    # Authenticate in Cloudendure
     authenticate(http_client, cloudendure_url, api_key)
 
     # Get project ID
