@@ -2,6 +2,7 @@
 import requests, boto3, json, sys
 from botocore.exceptions import ClientError
 from argparse import ArgumentParser
+from datetime import datetime
 
 def main():
     # Get AWS account name from input param
@@ -68,6 +69,11 @@ def main():
         source_ec2_name = machine['sourceProperties']['name']
         source_ec2_id = machine['sourceProperties']['machineCloudId']
 
+        # Update replication settings in each machine 
+        change_config = "useLowCostDisks"
+        low_cost_disks = True
+        update_machine_replication_config(http_client, cloudendure_url, cloudendure_project_id, cloudendure_machine_id, change_config, low_cost_disks)
+
         # Get security groups and subnet from source EC2
         print(f'Get Security Groups from instance {source_ec2_name} / {source_ec2_id}')
         sg_map, subnets = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id)
@@ -87,22 +93,22 @@ def main():
                 print(f'Updating Security Groups in Blueprint with ID: {cloudendure_machine_id}')
                 # TODO: temp hardcoded values until tested in internal network
                 change_config = "securityGroupIDs"
-                # security_groups = {
-                    # 'private_db_ecint': 'sg-0244a14e569eaba68',
-                    # 'private_active_directory_client': 'sg-3247085f',
-                    # 'private_db': 'sg-c54906a8',
-                    # 'console': 'sg-d64807bb'
-                    # }
+                security_groups = {
+                    'private_db_ecint': 'sg-0244a14e569eaba68',
+                    'private_active_directory_client': 'sg-3247085f',
+                    'private_db': 'sg-c54906a8',
+                    'console': 'sg-d64807bb'
+                    }
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, security_groups)
 
                 # Subnets
                 # TODO: temp hardcoded values until tested in internal network
                 change_config = "subnetIDs"
-                # subnets = {
-                    # # "eu-central-1a-private": "subnet-b70e54dc"
-                    # # "eu-central-1b-private": "subnet-096fff74"
-                    # "eu-central-1c-private": "subnet-00741c4d"
-                # }
+                subnets = {
+                    # "eu-central-1a-private": "subnet-b70e54dc"
+                    # "eu-central-1b-private": "subnet-096fff74"
+                    "eu-central-1c-private": "subnet-00741c4d"
+                }
                 print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnets)
 
@@ -162,8 +168,9 @@ def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudend
 
     return blueprint_config
 
-def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, machine_id, change_config, change_values):
-    # Update Cloudendure blueprint - currently supports update of securityGroupIDs and subnetIDs
+# TODO: update tags on blueprint - tag with modified date and time
+def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, cloudendure_machine_id, change_config, change_values):
+    # Update Cloudendure Blueprint - currently supports update of securityGroupIDs and subnetIDs
     blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
 
     list_of_changes = []
@@ -178,9 +185,20 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
     else:
         raise ValueError(f'Update Blueprint Error: change_config value not provided or incorrect')
 
+    currentTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     updated_config_values = {
-        "machineId": machine_id,
+        "machineId": cloudendure_machine_id,
         change_config: list_of_changes,
+        "tags": [
+            {
+                "key": "ManagedBy",
+                "value": "PythonScript"
+            },
+            {
+                "key": "LastUpdate",
+                "value": currentTime
+            }
+        ]
     }
 
     json_config_map = json.dumps(updated_config_values, indent=4)
@@ -190,19 +208,54 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
 
     print(f'Update blueprint {cloudendure_blueprint_id} - status {resp.status_code} {resp.reason}')
 
+def update_machine_replication_config(http_client, cloudendure_url, cloudendure_project_id, cloudendure_machine_id, change_config, change_values):
+    # Update Cloudendure Machine - currently supports update of replication settings tags
+    machine_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/machines/" + cloudendure_machine_id
+
+    list_of_changes = []
+
+    if change_config == "useLowCostDisks":
+        list_of_changes = change_values
+    else:
+        raise ValueError(f'Update Machine Error: change_config value not provided or incorrect')
+
+    currentTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    updated_config_values = {
+        "replicationConfiguration": {
+            change_config: list_of_changes,
+            "replicationTags": [
+                {
+                    "key": "ManagedBy",
+                    "value": "PythonScript"
+                },
+                {
+                    "key": "LastUpdate",
+                    "value": currentTime
+                }
+            ]
+        }
+    }
+
+    json_config_map = json.dumps(updated_config_values, indent=4)
+
+    resp = http_client.patch(url = machine_url, data=json_config_map)
+    resp.raise_for_status()
+
+    print(f'Update blueprint {cloudendure_machine_id} - status {resp.status_code} {resp.reason}')
+
 def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id):
     # Find EC2 instance by ID and get its security groups and subnet
 
     # Validate that provided instance is running
-    response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
-    # response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
+    # response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
+    response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
     if response['InstanceStatuses'][0]['InstanceState']['Name'] == 'running':
         try:
             # Get ec2 instance object
             resp = ec2_client.describe_instances(
                 Filters=[
-                    dict(Name='instance-id', Values=[ec2_id])
-                    # dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
+                    # dict(Name='instance-id', Values=[ec2_id])
+                    dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
                 ]
             )
         except ClientError as describeInstancesErr:
