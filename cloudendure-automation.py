@@ -87,22 +87,22 @@ def main():
                 print(f'Updating Security Groups in Blueprint with ID: {cloudendure_machine_id}')
                 # TODO: temp hardcoded values until tested in internal network
                 change_config = "securityGroupIDs"
-                security_groups = {
-                    'private_db_ecint': 'sg-0244a14e569eaba68',
-                    'private_active_directory_client': 'sg-3247085f',
-                    'private_db': 'sg-c54906a8',
-                    'console': 'sg-d64807bb'
-                    }
+                # security_groups = {
+                    # 'private_db_ecint': 'sg-0244a14e569eaba68',
+                    # 'private_active_directory_client': 'sg-3247085f',
+                    # 'private_db': 'sg-c54906a8',
+                    # 'console': 'sg-d64807bb'
+                    # }
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, security_groups)
 
                 # Subnets
                 # TODO: temp hardcoded values until tested in internal network
                 change_config = "subnetIDs"
-                subnets = {
-                    # "eu-central-1a-private": "subnet-b70e54dc"
-                    # "eu-central-1b-private": "subnet-096fff74"
-                    "eu-central-1c-private": "subnet-00741c4d"
-                }
+                # subnets = {
+                    # # "eu-central-1a-private": "subnet-b70e54dc"
+                    # # "eu-central-1b-private": "subnet-096fff74"
+                    # "eu-central-1c-private": "subnet-00741c4d"
+                # }
                 print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnets)
 
@@ -194,15 +194,15 @@ def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id):
     # Find EC2 instance by ID and get its security groups and subnet
 
     # Validate that provided instance is running
-    # response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
-    response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
+    response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
+    # response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
     if response['InstanceStatuses'][0]['InstanceState']['Name'] == 'running':
         try:
             # Get ec2 instance object
             resp = ec2_client.describe_instances(
                 Filters=[
-                    # dict(Name='instance-id', Values=[ec2_id])
-                    dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
+                    dict(Name='instance-id', Values=[ec2_id])
+                    # dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
                 ]
             )
         except ClientError as describeInstancesErr:
