@@ -8,8 +8,8 @@ def main():
     # Get AWS account name from input param
     parser = ArgumentParser()
     parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
+    parser.add_argument("--awsRegion", help="Provide AWS Region. If not provided defaults to eu-central-1", required=True)
     parser.add_argument("--apiKey", help="Provide Cloudendure authentication API Key")
-    parser.add_argument("--awsRegion", help="Provide AWS Region. If not provided defaults to eu-central-1")
     parser.add_argument("--awsProfile", help="Provide AWS Profile name. If not provided looks for credentials in environment variables")
     input_args = parser.parse_args()
 
@@ -20,8 +20,6 @@ def main():
     # Configure AWS Region
     if input_args.awsRegion:
         aws_region = input_args.awsRegion
-    else:
-        aws_region = "eu-central-1"
 
     # Init EC2 Client
     if input_args.awsProfile:
@@ -90,7 +88,7 @@ def main():
         for machine_id, blueprint_id in blueprint_id_map.items():
             if cloudendure_machine_id == machine_id:
                 # SG
-                print(f'Updating Security Groups in Blueprint with ID: {cloudendure_machine_id}')
+                print(f'Updating Security Groups in Blueprint with ID: {blueprint_id}')
                 # TODO: temp hardcoded values until tested in internal network
                 change_config = "securityGroupIDs"
                 security_groups = {
