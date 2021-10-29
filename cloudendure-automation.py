@@ -87,7 +87,19 @@ def main():
         print(f'Updating Cloudendure Machine with ID: {cloudendure_machine_id}')
         for machine_id, blueprint_id in blueprint_id_map.items():
             if cloudendure_machine_id == machine_id:
-                # SG
+
+                # Subnets - should be updated before security groups
+                # TODO: temp hardcoded values until tested in internal network
+                change_config = "subnetIDs"
+                subnets = {
+                    # "eu-central-1a-private": "subnet-b70e54dc"
+                    # "eu-central-1b-private": "subnet-096fff74"
+                    "eu-central-1c-private": "subnet-00741c4d"
+                }
+                print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
+                update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnets)
+
+                # SG - should be updated after subnet is set
                 print(f'Updating Security Groups in Blueprint with ID: {blueprint_id}')
                 # TODO: temp hardcoded values until tested in internal network
                 change_config = "securityGroupIDs"
@@ -98,17 +110,6 @@ def main():
                     'console': 'sg-d64807bb'
                     }
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, security_groups)
-
-                # Subnets
-                # TODO: temp hardcoded values until tested in internal network
-                change_config = "subnetIDs"
-                subnets = {
-                    # "eu-central-1a-private": "subnet-b70e54dc"
-                    # "eu-central-1b-private": "subnet-096fff74"
-                    "eu-central-1c-private": "subnet-00741c4d"
-                }
-                print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
-                update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnets)
 
                 blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id)
                 print(f'Blueprint updated to:  {blueprint_config}')
@@ -166,7 +167,6 @@ def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudend
 
     return blueprint_config
 
-# TODO: update tags on blueprint - tag with modified date and time
 def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, cloudendure_machine_id, change_config, change_values):
     # Update Cloudendure Blueprint - currently supports update of securityGroupIDs and subnetIDs
     blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
@@ -200,6 +200,8 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
     }
 
     json_config_map = json.dumps(updated_config_values, indent=4)
+
+    print(f'Update request json: \n{json_config_map}')
 
     resp = http_client.patch(url = blueprint_url, data=json_config_map)
     resp.raise_for_status()
