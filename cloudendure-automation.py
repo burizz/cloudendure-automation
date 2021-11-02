@@ -249,7 +249,7 @@ def update_machine_replication_config(http_client, cloudendure_url, cloudendure_
     resp = http_client.patch(url = machine_url, data=json_config_map)
     resp.raise_for_status()
 
-    print(f'Update blueprint {cloudendure_machine_id} - status {resp.status_code} {resp.reason}')
+    print(f'Update machine replication config {cloudendure_machine_id} - status {resp.status_code} {resp.reason}')
 
 
 def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_target_region):
