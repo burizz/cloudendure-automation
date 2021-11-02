@@ -8,7 +8,8 @@ def main():
     # Get AWS account name from input param
     parser = ArgumentParser()
     parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
-    parser.add_argument("--awsRegion", help="Provide AWS Region. If not provided defaults to eu-central-1", required=True)
+    parser.add_argument("--awsSourceRegion", help="Provide Source AWS Region. ", required=True)
+    parser.add_argument("--awsTargetRegion", help="Provide Target AWS Region. ", required=True)
     parser.add_argument("--apiKey", help="Provide Cloudendure authentication API Key")
     parser.add_argument("--awsProfile", help="Provide AWS Profile name. If not provided looks for credentials in environment variables")
     input_args = parser.parse_args()
@@ -18,13 +19,14 @@ def main():
     http_client.headers.update({'content-type': 'application/json'})
 
     # Configure AWS Region
-    if input_args.awsRegion:
-        aws_region = input_args.awsRegion
+    if input_args.awsSourceRegion:
+        aws_source_region = input_args.awsSourceRegion
+        aws_target_region = input_args.awsTargetRegion
 
     # Init EC2 Client
     if input_args.awsProfile:
         boto3.setup_default_session(profile_name=input_args.awsProfile)
-    ec2_client = boto3.client('ec2', region_name=aws_region)
+    ec2_client = boto3.client('ec2', region_name=aws_source_region)
 
     # Main Cloudendure API URL
     cloudendure_url = "https://console.cloudendure.com/api/latest"
@@ -74,7 +76,7 @@ def main():
 
         # Get security groups and subnet from source EC2
         print(f'Get Security Groups from instance {source_ec2_name} / {source_ec2_id}')
-        sg_map, subnets = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id)
+        sg_map, subnets = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id, aws_source_region, aws_target_region)
         security_groups = {}
         for security_group in sg_map:
             sg_name = security_group['GroupName']
@@ -114,6 +116,7 @@ def main():
                 blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id)
                 print(f'Blueprint updated to:  {blueprint_config}')
 
+
 def authenticate(http_client, cloudendure_url, api_key):
     # Login to Cloudendure and get Cookie and XSRF token
     login_url = cloudendure_url + "/login"
@@ -126,6 +129,7 @@ def authenticate(http_client, cloudendure_url, api_key):
     http_client.headers.update({'X-XSRF-TOKEN': xsrf_token})
     print('Authenticated to cloudendure successfully')
 
+
 def list_projects(http_client, cloudendure_url):
     # Get Projects definition and return as JSON
     projects_url = cloudendure_url + "/projects"
@@ -135,6 +139,7 @@ def list_projects(http_client, cloudendure_url):
     project_list = resp.json()
 
     return project_list
+
 
 def list_machines(http_client, cloudendure_url, cloudendure_project_id):
     # Get Machines definition and return as JSON
@@ -146,6 +151,7 @@ def list_machines(http_client, cloudendure_url, cloudendure_project_id):
 
     return machine_list
 
+
 def list_blueprints(http_client, cloudendure_url, cloudendure_project_id):
     # Get Projects definition and return as JSON
     blueprints_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints"
@@ -155,6 +161,7 @@ def list_blueprints(http_client, cloudendure_url, cloudendure_project_id):
     blueprint_list = resp.json()
 
     return blueprint_list
+
 
 def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id):
     # Get Blueprint definition and return as JSON
@@ -166,6 +173,7 @@ def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudend
     blueprint_config = resp.json()
 
     return blueprint_config
+
 
 def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, cloudendure_machine_id, change_config, change_values):
     # Update Cloudendure Blueprint - currently supports update of securityGroupIDs and subnetIDs
@@ -243,8 +251,9 @@ def update_machine_replication_config(http_client, cloudendure_url, cloudendure_
 
     print(f'Update blueprint {cloudendure_machine_id} - status {resp.status_code} {resp.reason}')
 
-def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id):
-    # Find EC2 instance by ID and get its security groups and subnet
+
+def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_target_region):
+    # Find EC2 instance by ID and get its security groups and subnet id; find equivalent subnet id in the target region and generate a map of security groups and subnets to be applied on blueprint
 
     # Validate that provided instance is running
     # response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
@@ -261,15 +270,69 @@ def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id):
         except ClientError as describeInstancesErr:
             print(describeInstancesErr)
 
-    # Get Security group name and ids
+    # Get Security group name/id and subnet id
     security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
+    source_subnet_id = resp['Reservations'][0]['Instances'][0]['SubnetId']
+
+    # Find subnet name from id
+    source_subnet_name = get_subnet_name(ec2_client, source_subnet_id)
+
+    # Replace AWS region in Subnet name, ex. - from eu-west-1a-private to eu-central-1a-private
+    target_subnet_name = convert_subnet_name(source_subnet_name, aws_source_region, aws_target_region)
+
+    # Find subnet id of equivalent subnet in target AWS region
+    target_subnet_id = get_subnet_id(aws_target_region, target_subnet_name)
 
     # Get Subnet name and id
     subnets = {}
-    subnet = resp['Reservations'][0]['Instances'][0]['SubnetId']
-    subnets['private-subnet'] = subnet
+    subnets[target_subnet_name] = target_subnet_id
 
     return security_group_map, subnets
+
+
+def get_subnet_name(ec2_client, subnet_id):
+    # Get subnet name from id
+    list_of_subnets = ec2_client.describe_subnets()
+    for subnet in list_of_subnets['Subnets']:
+        if subnet_id == subnet['SubnetId']:
+            for tag in subnet['Tags']:
+                if tag["Key"] == 'Name':
+                    subnet_name = tag["Value"]
+                    return subnet_name
+                else:
+                    # TODO: convert this to an exception
+                    print(f"Error No Name tag present in subnet, tags configured on subnet: {subnet['Tags']}")
+
+    # TODO: convert this to an exception
+    print(f'Provided subnet id does not exist, subnet id: {subnet_id}')
+
+
+def get_subnet_id(aws_region, subnet_name):
+    # Init EC2 client to target aws_region
+    ec2_client = boto3.client('ec2', region_name=aws_region)
+
+    # Get subnet id from name
+    list_of_subnets = ec2_client.describe_subnets()
+    for subnet in list_of_subnets['Subnets']:
+        for tag in subnet['Tags']:
+            if tag["Key"] == 'Name':
+                if subnet_name == tag["Value"]:
+                    subnet_id = subnet["SubnetId"]
+                    print(f'HERE SUBNET ID: {subnet_id}')
+                return subnet_id
+            else:
+                # TODO: convert this to an exception
+                print(f"Error No Name tag present in subnet, tags configured on subnet: {subnet['Tags']}")
+
+    # TODO: convert this to an exception
+    print(f'Provided subnet name does not exist, subnet name: {subnet_name}')
+
+
+def convert_subnet_name(source_subnet_name, aws_source_region, aws_target_region):
+    # Replace AWS region in Subnet name, ex. - from eu-west-1a-private to eu-central-1a-private
+    converted_subnet_name = source_subnet_name.replace(aws_source_region, aws_target_region)
+    return converted_subnet_name
+
 
 if __name__ == "__main__":
     main()
