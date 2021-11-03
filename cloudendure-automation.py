@@ -76,13 +76,7 @@ def main():
 
         # Get security groups and subnet from source EC2
         print(f'Get Security Groups from instance {source_ec2_name} / {source_ec2_id}')
-        sg_map, subnets = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id, aws_source_region, aws_target_region)
-        security_groups = {}
-        for security_group in sg_map:
-            sg_name = security_group['GroupName']
-            sg_id = security_group['GroupId']
-            security_groups[sg_name] = sg_id
-        print(f'Security groups to be applied {security_groups}')
+        sg_map, subnet_map = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id, aws_source_region, aws_target_region)
 
         # Update security groups in target machine blueprint to match source's
         cloudendure_machine_id = machine['id']
@@ -93,12 +87,12 @@ def main():
                 # Subnets - should be updated before security groups
                 change_config = "subnetIDs"
                 print(f'Updating Subnet in Blueprint with ID: {blueprint_id}')
-                update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnets)
+                update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnet_map)
 
                 # SG - should be updated after subnet is set
                 print(f'Updating Security Groups in Blueprint with ID: {blueprint_id}')
                 change_config = "securityGroupIDs"
-                update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, security_groups)
+                update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, sg_map)
 
                 blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id)
                 print(f'Blueprint updated to:  {blueprint_config}')
@@ -255,8 +249,8 @@ def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_ta
         except ClientError as describeInstancesErr:
             print(describeInstancesErr)
 
-    # Get Security group name/id and subnet id
-    security_group_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
+    ## Subnets ###
+    # Get Subnet name/id from source EC2
     source_subnet_id = resp['Reservations'][0]['Instances'][0]['SubnetId']
 
     # Find subnet name from id
@@ -268,11 +262,22 @@ def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_ta
     # Find subnet id of equivalent subnet in target AWS region
     target_subnet_id = get_subnet_id(aws_target_region, target_subnet_name)
 
-    # Get Subnet name and id
-    subnets = {}
-    subnets[target_subnet_name] = target_subnet_id
+    # Map of subnet name/id
+    target_subnet_map = {}
+    target_subnet_map[target_subnet_name] = target_subnet_id
 
-    return security_group_map, subnets
+    ### Security Groups ###
+    # Get Security group name/id from source EC2
+    source_sg_map = resp['Reservations'][0]['Instances'][0]['SecurityGroups']
+
+    # Find matching security group id in target aws account
+    target_sg_map = {}
+    for security_group in source_sg_map:
+        target_sg_name = security_group['GroupName']
+        target_sg_id = get_security_group_id(aws_target_region, target_sg_name)
+        target_sg_map[target_sg_name] = target_sg_id
+
+    return target_sg_map, target_subnet_map
 
 
 def get_subnet_name(ec2_client, subnet_id):
@@ -292,9 +297,9 @@ def get_subnet_name(ec2_client, subnet_id):
         raise Exception(f'Provided subnet id does not exist, subnet id: {subnet_id}')
 
 
-def get_subnet_id(aws_region, target_subnet_name):
+def get_subnet_id(target_aws_region, target_subnet_name):
     # Init EC2 client to target aws_region
-    ec2_client = boto3.client('ec2', region_name=aws_region)
+    ec2_client = boto3.client('ec2', region_name=target_aws_region)
 
     id_set = False
 
@@ -321,6 +326,24 @@ def convert_subnet_name(source_subnet_name, aws_source_region, aws_target_region
         raise Exception(f'Subnet name: {source_subnet_name} could not be converted to target region')
 
     return converted_subnet_name
+
+
+def get_security_group_id(target_aws_region, target_security_group_name):
+    # Init EC2 client to target aws_region
+    ec2_client = boto3.client('ec2', region_name=target_aws_region)
+
+    try:
+        # Get subnet id from name
+        ec2_response = ec2_client.describe_security_groups(
+            Filters=[
+                dict(Name='group-name', Values=[target_security_group_name])
+            ]
+        )
+        security_group_id = ec2_response['SecurityGroups'][0]['GroupId']
+    except:
+        raise Exception(f'Error retrieving target security group: {target_security_group_name}')
+
+    return security_group_id
 
 
 if __name__ == "__main__":
