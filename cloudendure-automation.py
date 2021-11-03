@@ -91,26 +91,13 @@ def main():
             if cloudendure_machine_id == machine_id:
 
                 # Subnets - should be updated before security groups
-                # TODO: temp hardcoded values until tested in internal network
                 change_config = "subnetIDs"
-                subnets = {
-                    # "eu-central-1a-private": "subnet-b70e54dc"
-                    # "eu-central-1b-private": "subnet-096fff74"
-                    "eu-central-1c-private": "subnet-00741c4d"
-                }
-                print(f'Updating Subnet in Blueprint with ID: {cloudendure_machine_id}')
+                print(f'Updating Subnet in Blueprint with ID: {blueprint_id}')
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnets)
 
                 # SG - should be updated after subnet is set
                 print(f'Updating Security Groups in Blueprint with ID: {blueprint_id}')
-                # TODO: temp hardcoded values until tested in internal network
                 change_config = "securityGroupIDs"
-                security_groups = {
-                    'private_db_ecint': 'sg-0244a14e569eaba68',
-                    'private_active_directory_client': 'sg-3247085f',
-                    'private_db': 'sg-c54906a8',
-                    'console': 'sg-d64807bb'
-                    }
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, security_groups)
 
                 blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id)
@@ -256,15 +243,13 @@ def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_ta
     # Find EC2 instance by ID and get its security groups and subnet id; find equivalent subnet id in the target region and generate a map of security groups and subnets to be applied on blueprint
 
     # Validate that provided instance is running
-    # response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
-    response = ec2_client.describe_instance_status(InstanceIds=["i-063f0d9ced870fe0b"])
+    response = ec2_client.describe_instance_status(InstanceIds=[ec2_id])
     if response['InstanceStatuses'][0]['InstanceState']['Name'] == 'running':
         try:
             # Get ec2 instance object
             resp = ec2_client.describe_instances(
                 Filters=[
-                    # dict(Name='instance-id', Values=[ec2_id])
-                    dict(Name='instance-id', Values=["i-063f0d9ced870fe0b"])
+                    dict(Name='instance-id', Values=[ec2_id])
                 ]
             )
         except ClientError as describeInstancesErr:
@@ -291,6 +276,8 @@ def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_ta
 
 
 def get_subnet_name(ec2_client, subnet_id):
+    set_name = False
+
     # Get subnet name from id
     list_of_subnets = ec2_client.describe_subnets()
     for subnet in list_of_subnets['Subnets']:
@@ -298,39 +285,41 @@ def get_subnet_name(ec2_client, subnet_id):
             for tag in subnet['Tags']:
                 if tag["Key"] == 'Name':
                     subnet_name = tag["Value"]
+                    set_name = True
                     return subnet_name
-                else:
-                    # TODO: convert this to an exception
-                    print(f"Error No Name tag present in subnet, tags configured on subnet: {subnet['Tags']}")
 
-    # TODO: convert this to an exception
-    print(f'Provided subnet id does not exist, subnet id: {subnet_id}')
+    if not set_name:
+        raise Exception(f'Provided subnet id does not exist, subnet id: {subnet_id}')
 
 
-def get_subnet_id(aws_region, subnet_name):
+def get_subnet_id(aws_region, target_subnet_name):
     # Init EC2 client to target aws_region
     ec2_client = boto3.client('ec2', region_name=aws_region)
+
+    id_set = False
 
     # Get subnet id from name
     list_of_subnets = ec2_client.describe_subnets()
     for subnet in list_of_subnets['Subnets']:
         for tag in subnet['Tags']:
             if tag["Key"] == 'Name':
-                if subnet_name == tag["Value"]:
+                current_subnet = tag["Value"]
+                if target_subnet_name == current_subnet:
                     subnet_id = subnet["SubnetId"]
-                    print(f'HERE SUBNET ID: {subnet_id}')
-                return subnet_id
-            else:
-                # TODO: convert this to an exception
-                print(f"Error No Name tag present in subnet, tags configured on subnet: {subnet['Tags']}")
+                    id_set = True
+                    return subnet_id
 
-    # TODO: convert this to an exception
-    print(f'Provided subnet name does not exist, subnet name: {subnet_name}')
+    if not id_set:
+        raise Exception(f'Provided subnet name does not exist, subnet name: {target_subnet_name}')
 
 
 def convert_subnet_name(source_subnet_name, aws_source_region, aws_target_region):
     # Replace AWS region in Subnet name, ex. - from eu-west-1a-private to eu-central-1a-private
-    converted_subnet_name = source_subnet_name.replace(aws_source_region, aws_target_region)
+    try:
+        converted_subnet_name = source_subnet_name.replace(aws_source_region, aws_target_region)
+    except:
+        raise Exception(f'Subnet name: {source_subnet_name} could not be converted to target region')
+
     return converted_subnet_name
 
 
