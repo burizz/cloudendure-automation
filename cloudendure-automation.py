@@ -46,7 +46,7 @@ def main():
     for project in project_json_configs['items']:
         project_name = project['name']
         project_id = project['id']
-        if project_name == input_args.accountName:
+        if project_name == input_args.cloudEndureProjectName:
             print(f'Working with project [{project_name}]')
             cloudendure_project_id = project_id
 
