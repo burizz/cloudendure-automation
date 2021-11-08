@@ -70,7 +70,7 @@ def main():
         source_ec2_name = machine['sourceProperties']['name']
         source_ec2_id = machine['sourceProperties']['machineCloudId']
 
-        print(f'START UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}')
+        print(f'\nSTART UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}\n')
 
         # Update replication settings in each machine 
         change_config = "useLowCostDisks"
@@ -78,7 +78,7 @@ def main():
         update_machine_replication_config(http_client, cloudendure_url, cloudendure_project_id, cloudendure_machine_id, change_config, low_cost_disks)
 
         # Get security groups and subnet from source EC2
-        print(f'Get Security Groups from instance {source_ec2_name} / {source_ec2_id}')
+        print(f'Get Security Groups from EC2 instance {source_ec2_name} / {source_ec2_id}')
         sg_map, subnet_map = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id, aws_source_region, aws_target_region)
 
         # Update security groups in target machine blueprint to match source's
@@ -101,7 +101,7 @@ def main():
                 print(f'Blueprint updated to: {blueprint_config}')
 
                 machine_counter -= 1
-                print(f'FINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines {machine_counter}')
+                print(f'\nFINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines {machine_counter}\n')
 
 
 
