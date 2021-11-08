@@ -205,7 +205,7 @@ def update_machine_replication_config(http_client, cloudendure_url, cloudendure_
     # Error handling
     resp.raise_for_status()
 
-    print(f'Update replication config on machine {cloudendure_machine_id} successful - status {resp.status_code} {resp.reason}')
+    print(f'Update replication config on machine {cloudendure_machine_id} successful - status {resp.status_code} {resp.reason}\n')
 
 
 def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, cloudendure_machine_id, change_config, change_values):
@@ -244,7 +244,7 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
     # Error handling
     resp.raise_for_status()
 
-    print(f'Update blueprint config {cloudendure_blueprint_id} successful - status {resp.status_code} {resp.reason}')
+    print(f'Update blueprint config {cloudendure_blueprint_id} successful - status {resp.status_code} {resp.reason}\n')
 
 
 def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_target_region):
