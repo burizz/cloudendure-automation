@@ -101,7 +101,7 @@ def main():
                 print(f'Blueprint updated to: {blueprint_config}')
 
                 machine_counter -= 1
-                print(f'\nFINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines {machine_counter}\n')
+                print(f'\nFINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines [{machine_counter}]\n')
 
 
 
