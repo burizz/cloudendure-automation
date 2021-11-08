@@ -7,10 +7,10 @@ from datetime import datetime
 def main():
     # Get AWS account name from input param
     parser = ArgumentParser()
-    parser.add_argument("--accountName", help="Provide AWS Account Name(ex. ecint-non-prod)", required=True)
+    parser.add_argument("--cloudEndureProjectName", help="Provide Cloudendure Project Name - matches AWS Account Names(ex. ecint-non-prod)", required=True)
     parser.add_argument("--awsSourceRegion", help="Provide Source AWS Region. ", required=True)
     parser.add_argument("--awsTargetRegion", help="Provide Target AWS Region. ", required=True)
-    parser.add_argument("--apiKey", help="Provide Cloudendure authentication API Key")
+    parser.add_argument("--cloudEndureApiKey", help="Provide Cloudendure authentication API Key")
     parser.add_argument("--awsProfile", help="Provide AWS Profile name. If not provided looks for credentials in environment variables")
     input_args = parser.parse_args()
 
@@ -34,7 +34,7 @@ def main():
 
     # Configure Cloudendure API Key
     if input_args.apiKey:
-        api_key = input_args.apiKey
+        api_key = input_args.cloudEndureApiKey
     else:
         api_key = "6F1A-C693-6F14-0E7C-F296-C4BE-5CF5-269A-017E-D864-B9D1-2BD6-5693-6A0F-622D-E7E2"
 
