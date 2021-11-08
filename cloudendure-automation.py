@@ -63,6 +63,7 @@ def main():
     # Get machine objects 
     machine_json_configs = list_machines(http_client, cloudendure_url, cloudendure_project_id)
     machine_counter = len(machine_json_configs['items'])
+    print(f'Total cloudendure machines to be updated {machine_counter}')
 
     # Update blueprint in each cloudendure machine
     for machine in machine_json_configs['items']:
@@ -78,7 +79,7 @@ def main():
         update_machine_replication_config(http_client, cloudendure_url, cloudendure_project_id, cloudendure_machine_id, change_config, low_cost_disks)
 
         # Get security groups and subnet from source EC2
-        print(f'Get Security Groups from EC2 instance {source_ec2_name} / {source_ec2_id}')
+        print(f'Get Security Groups from EC2 instance {source_ec2_name} / {source_ec2_id}\n')
         sg_map, subnet_map = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id, aws_source_region, aws_target_region)
 
         # Update security groups in target machine blueprint to match source's
