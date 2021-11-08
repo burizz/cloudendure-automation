@@ -62,12 +62,15 @@ def main():
 
     # Get machine objects 
     machine_json_configs = list_machines(http_client, cloudendure_url, cloudendure_project_id)
+    machine_counter = len(machine_json_configs['items'])
 
     # Update blueprint in each cloudendure machine
     for machine in machine_json_configs['items']:
         # Get source EC2's instance id and name
         source_ec2_name = machine['sourceProperties']['name']
         source_ec2_id = machine['sourceProperties']['machineCloudId']
+
+        print(f'START UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}')
 
         # Update replication settings in each machine 
         change_config = "useLowCostDisks"
@@ -95,7 +98,11 @@ def main():
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, sg_map)
 
                 blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id)
-                print(f'Blueprint updated to:  {blueprint_config}')
+                print(f'Blueprint updated to: {blueprint_config}')
+
+                machine_counter -= 1
+                print(f'FINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines {machine_counter}')
+
 
 
 def authenticate(http_client, cloudendure_url, api_key):
@@ -103,6 +110,7 @@ def authenticate(http_client, cloudendure_url, api_key):
     login_url = cloudendure_url + "/login"
 
     resp = http_client.post(url = login_url, json={"userApiToken": api_key})
+    # Error handling
     resp.raise_for_status()
 
     # Set XSRF Token header for HTTP Session
@@ -115,6 +123,7 @@ def list_projects(http_client, cloudendure_url):
     # Get Projects definition and return as JSON
     projects_url = cloudendure_url + "/projects"
     resp = http_client.get(url = projects_url)
+    # Error handling
     resp.raise_for_status()
 
     project_list = resp.json()
@@ -126,6 +135,7 @@ def list_machines(http_client, cloudendure_url, cloudendure_project_id):
     # Get Machines definition and return as JSON
     machines_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/machines"
     resp = http_client.get(url = machines_url)
+    # Error handling
     resp.raise_for_status()
 
     machine_list = resp.json()
@@ -137,6 +147,7 @@ def list_blueprints(http_client, cloudendure_url, cloudendure_project_id):
     # Get Projects definition and return as JSON
     blueprints_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints"
     resp = http_client.get(url = blueprints_url)
+    # Error handling
     resp.raise_for_status()
 
     blueprint_list = resp.json()
@@ -149,53 +160,13 @@ def get_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudend
     blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
 
     resp = http_client.get(url = blueprint_url)
+    # Error handling
     resp.raise_for_status()
 
     blueprint_config = resp.json()
 
     return blueprint_config
 
-
-def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, cloudendure_machine_id, change_config, change_values):
-    # Update Cloudendure Blueprint - currently supports update of securityGroupIDs and subnetIDs
-    blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
-
-    list_of_changes = []
-
-    if change_config == "securityGroupIDs":
-        for key, value in change_values.items():
-            list_of_changes.append(value)
-
-    elif change_config == "subnetIDs":
-        for key, value in change_values.items():
-            list_of_changes.append(value)
-    else:
-        raise ValueError(f'Update Blueprint Error: change_config value not provided or incorrect')
-
-    currentTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    updated_config_values = {
-        "machineId": cloudendure_machine_id,
-        change_config: list_of_changes,
-        "tags": [
-            {
-                "key": "ManagedBy",
-                "value": "PythonScript"
-            },
-            {
-                "key": "LastUpdate",
-                "value": currentTime
-            }
-        ]
-    }
-
-    json_config_map = json.dumps(updated_config_values, indent=4)
-
-    print(f'Update request json: \n{json_config_map}')
-
-    resp = http_client.patch(url = blueprint_url, data=json_config_map)
-    resp.raise_for_status()
-
-    print(f'Update blueprint {cloudendure_blueprint_id} - status {resp.status_code} {resp.reason}')
 
 def update_machine_replication_config(http_client, cloudendure_url, cloudendure_project_id, cloudendure_machine_id, change_config, change_values):
     # Update Cloudendure Machine - currently supports update of replication settings tags
@@ -207,6 +178,8 @@ def update_machine_replication_config(http_client, cloudendure_url, cloudendure_
         list_of_changes = change_values
     else:
         raise ValueError(f'Update Machine Error: change_config value not provided or incorrect')
+
+    print(f'Updating replication config for machine with id {cloudendure_machine_id}')
 
     currentTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     updated_config_values = {
@@ -226,11 +199,52 @@ def update_machine_replication_config(http_client, cloudendure_url, cloudendure_
     }
 
     json_config_map = json.dumps(updated_config_values, indent=4)
+    print(f'Update machine replication config - request: \n{json_config_map}')
 
     resp = http_client.patch(url = machine_url, data=json_config_map)
+    # Error handling
     resp.raise_for_status()
 
-    print(f'Update machine replication config {cloudendure_machine_id} - status {resp.status_code} {resp.reason}')
+    print(f'Update replication config on machine {cloudendure_machine_id} successful - status {resp.status_code} {resp.reason}')
+
+
+def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, cloudendure_machine_id, change_config, change_values):
+    # Update Cloudendure Blueprint - currently supports update of securityGroupIDs and subnetIDs
+    blueprint_url = cloudendure_url + "/projects/" + cloudendure_project_id + "/blueprints/" + cloudendure_blueprint_id
+
+    list_of_changes = []
+
+    if change_config == "securityGroupIDs" or change_config == "subnetIDs":
+        for key, value in change_values.items():
+            list_of_changes.append(value)
+
+    else:
+        raise ValueError(f'Update Blueprint Error: change_config value not provided or incorrect - supported values are \'securityGroupIDs\' and \'subnetIDs\'')
+
+    currentTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    updated_config_values = {
+        "machineId": cloudendure_machine_id,
+        change_config: list_of_changes,
+        "tags": [
+            {
+                "key": "ManagedBy",
+                "value": "PythonScript"
+            },
+            {
+                "key": "LastUpdate",
+                "value": currentTime
+            }
+        ]
+    }
+
+    json_config_map = json.dumps(updated_config_values, indent=4)
+    print(f'Update blueprint config - request: \n{json_config_map}')
+
+    resp = http_client.patch(url = blueprint_url, data=json_config_map)
+    # Error handling
+    resp.raise_for_status()
+
+    print(f'Update blueprint config {cloudendure_blueprint_id} successful - status {resp.status_code} {resp.reason}')
 
 
 def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_target_region):
