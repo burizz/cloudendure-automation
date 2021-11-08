@@ -9,6 +9,7 @@ Script arguments :
 
  AWS Profile: --awsProfile (optional)
  Cloudendure API Key: --cloudEndureApiKey (optional)  
+ Script Log Level --logLevel (optional)
 
 AWS Account name needs to existing in Cloudendure with the same name
 Example :
@@ -16,7 +17,7 @@ Example :
 python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1
 ```
 
-Example with enabled Debug Log Level
+Example with enabled debug Log Level
 ```
 python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1 --logLevel debug
 ```
