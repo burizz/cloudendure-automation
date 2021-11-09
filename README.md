@@ -2,14 +2,14 @@
 
 Cloudendure automation (tested on Python 3.8.10)
 
-Script arguments :
+Script arguments:  
  Cloudendure Project name: --cloudEndureProjectName (required)  
- AWS Source Region: --awsSourceRegion (required)
- AWS Target Region: --awsTargetRegion (required)
+ AWS Source Region: --awsSourceRegion (required)  
+ AWS Target Region: --awsTargetRegion (required)  
 
- AWS Profile: --awsProfile (optional)
+ AWS Profile: --awsProfile (optional)  
  Cloudendure API Key: --cloudEndureApiKey (optional)  
- Script Log Level --logLevel (optional)
+ Script Log Level --logLevel (optional)  
 
 AWS Account name needs to existing in Cloudendure with the same name
 Example :
