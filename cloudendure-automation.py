@@ -10,7 +10,6 @@ from datetime import datetime
 
 
 def main():
-    # Get AWS account name from input param
     parser = ArgumentParser()
     parser.add_argument("--cloudEndureProjectName", help="Provide Cloudendure Project Name - matches AWS Account Names(ex. ecint-non-prod)", required=True)
     parser.add_argument("--awsSourceRegion", help="Provide Source AWS Region. ", required=True)
@@ -26,7 +25,6 @@ def main():
             level=logging.INFO,
             format="%(asctime)s DEBUG: %(message)s"
         )
-
     else:
         logging.basicConfig(
             level=logging.WARNING,
