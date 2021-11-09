@@ -12,24 +12,20 @@ def main():
     parser.add_argument("--awsTargetRegion", help="Provide Target AWS Region. ", required=True)
     parser.add_argument("--cloudEndureApiKey", help="Provide Cloudendure authentication API Key")
     parser.add_argument("--awsProfile", help="Provide AWS Profile name. If not provided looks for credentials in environment variables")
-    parser.add_argument("--logLevel", help="Provide Log level. If not provided defaults to Info", choices=["debug", "DEBUG", "Debug"])
+    parser.add_argument("--logLevel", help="Provide Log level. If not provided defaults to Info", choices=["debug", "DEBUG", "Debug", "info", "INFO", "Info"])
     input_args = parser.parse_args()
 
-    # Custom log level to capture detailed log events
-    logging.addLevelName(15, 'DETAILED')
-
     # Configure Log Level
-    if input_args.logLevel == 'debug' or input_args.logLevel == 'DEBUG' or input_args.logLevel == 'Debug':
+    if input_args.logLevel.lower() == 'debug' or input_args.logLevel.lower() == 'info':
         logging.basicConfig(
-            level=logging.DETAILED, # DETAILED = 15 
-            format="%(asctime)s:%(levelname)s:%(message)s"
+            level=logging.INFO, # DETAILED = 15 
+            format="%(asctime)s %(message)s"
         )
-        assert logging.getLevelName(15) == 'DETAILED'
 
     else:
         logging.basicConfig(
-            level=logging.INFO, # INFO = 20
-            format="%(asctime)s:%(levelname)s:%(message)s"
+            level=logging.WARNING, # INFO = 20
+            format="%(asctime)s %(message)s"
         )
 
     # Init HTTP Client Session
@@ -49,7 +45,7 @@ def main():
     # Main Cloudendure API URL
     cloudendure_url = "https://console.cloudendure.com/api/latest"
     # print(f'Cloudendure API URL set to {cloudendure_url}')
-    logging.info(f'Cloudendure API URL set to {cloudendure_url}')
+    logging.warning(f'Cloudendure API URL set to {cloudendure_url}')
 
     # Configure Cloudendure API Key
     if input_args.cloudEndureApiKey:
@@ -67,7 +63,7 @@ def main():
         project_id = project['id']
         if project_name == input_args.cloudEndureProjectName:
             # print(f'Working with project [{project_name}]')
-            logging.info(f'Working with project [{project_name}]')
+            logging.warning(f'Working with project [{project_name}]')
             cloudendure_project_id = project_id
 
     # Get blueprint objects
@@ -84,7 +80,7 @@ def main():
     machine_json_configs = list_machines(http_client, cloudendure_url, cloudendure_project_id)
     machine_counter = len(machine_json_configs['items'])
     # print(f'Total cloudendure machines to be updated {machine_counter}')
-    logging.info(f'Total cloudendure machines to be updated {machine_counter}')
+    logging.warning(f'Total cloudendure machines to be updated {machine_counter}')
 
     # Update blueprint in each cloudendure machine
     for machine in machine_json_configs['items']:
@@ -93,7 +89,7 @@ def main():
         source_ec2_id = machine['sourceProperties']['machineCloudId']
 
         # print(f'\nSTART UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}\n')
-        logging.info(f'\nSTART UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}\n')
+        logging.warning(f'\nSTART UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}\n')
 
         # Update replication settings in each machine 
         change_config = "useLowCostDisks"
@@ -102,35 +98,35 @@ def main():
 
         # Get security groups and subnet from source EC2
         # print(f'Get Security Groups from EC2 instance {source_ec2_name} / {source_ec2_id}\n')
-        logging.log("DETAILED", f'Get Security Groups from EC2 instance {source_ec2_name} / {source_ec2_id}\n')
+        logging.info(f'Get Security Groups from EC2 instance {source_ec2_name} / {source_ec2_id}\n')
         sg_map, subnet_map = get_ec2_instance_sg_and_subnet(ec2_client, source_ec2_id, aws_source_region, aws_target_region)
 
         # Update security groups in target machine blueprint to match source's
         cloudendure_machine_id = machine['id']
         # print(f'Updating Cloudendure Machine with ID: {cloudendure_machine_id}')
-        logging.log("DETAILED", f'Updating Cloudendure Machine with ID: {cloudendure_machine_id}')
+        logging.info(f'Updating Cloudendure Machine with ID: {cloudendure_machine_id}')
         for machine_id, blueprint_id in blueprint_id_map.items():
             if cloudendure_machine_id == machine_id:
 
                 # Subnets - should be updated before security groups
                 change_config = "subnetIDs"
                 # print(f'Updating Subnet in Blueprint with ID: {blueprint_id}')
-                logging.log("DETAILED", f'Updating Subnet in Blueprint with ID: {blueprint_id}')
+                logging.info(f'Updating Subnet in Blueprint with ID: {blueprint_id}')
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, subnet_map)
 
                 # SG - should be updated after subnet is set
                 # print(f'Updating Security Groups in Blueprint with ID: {blueprint_id}')
-                logging.log("DETAILED", f'Updating Security Groups in Blueprint with ID: {blueprint_id}')
+                logging.info(f'Updating Security Groups in Blueprint with ID: {blueprint_id}')
                 change_config = "securityGroupIDs"
                 update_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id, machine_id, change_config, sg_map)
 
                 blueprint_config = get_blueprint(http_client, cloudendure_url, cloudendure_project_id, blueprint_id)
                 # print(f'Blueprint updated to: {blueprint_config}')
-                logging.log("DETAILED", f'Blueprint updated to: {blueprint_config}')
+                logging.info(f'Blueprint updated to: {blueprint_config}')
 
                 machine_counter -= 1
                 # print(f'\nFINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines [{machine_counter}]\n')
-                logging.info(f'\nFINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines [{machine_counter}]\n')
+                logging.warning(f'\nFINISHED UPDATE OF CLOUDENDURE MACHINE - {source_ec2_name}; remaining machines [{machine_counter}]\n')
 
 
 
@@ -147,7 +143,7 @@ def authenticate(http_client, cloudendure_url, api_key):
     http_client.headers.update({'X-XSRF-TOKEN': xsrf_token})
 
     # print('Authenticated to cloudendure successfully')
-    logging.info('Authenticated to cloudendure successfully')
+    logging.warning('Authenticated to cloudendure successfully')
 
 
 def list_projects(http_client, cloudendure_url):
@@ -211,7 +207,7 @@ def update_machine_replication_config(http_client, cloudendure_url, cloudendure_
         raise ValueError(f'Update Machine Error: change_config value not provided or incorrect')
 
     # print(f'Updating replication config for machine with id {cloudendure_machine_id}')
-    logging.log("DETAILED", f'Updating replication config for machine with id {cloudendure_machine_id}')
+    logging.info(f'Updating replication config for machine with id {cloudendure_machine_id}')
 
     currentTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     updated_config_values = {
@@ -232,14 +228,14 @@ def update_machine_replication_config(http_client, cloudendure_url, cloudendure_
 
     json_config_map = json.dumps(updated_config_values, indent=4)
     # print(f'Update machine replication config - request: \n{json_config_map}')
-    logging.log("DETAILED", f'Update machine replication config - request: \n{json_config_map}')
+    logging.info(f'Update machine replication config - request: \n{json_config_map}')
 
     resp = http_client.patch(url = machine_url, data=json_config_map)
     # Error handling
     resp.raise_for_status()
 
     # print(f'Update replication config on machine {cloudendure_machine_id} successful - status {resp.status_code} {resp.reason}\n')
-    logging.info(f'Update replication config on machine {cloudendure_machine_id} successful - status {resp.status_code} {resp.reason}\n')
+    logging.warn(f'Update replication config on machine {cloudendure_machine_id} successful - status {resp.status_code} {resp.reason}\n')
 
 
 def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloudendure_blueprint_id, cloudendure_machine_id, change_config, change_values):
@@ -273,14 +269,14 @@ def update_blueprint(http_client, cloudendure_url, cloudendure_project_id, cloud
 
     json_config_map = json.dumps(updated_config_values, indent=4)
     # print(f'Update blueprint config - request: \n{json_config_map}')
-    logging.log("DETAILED", f'Update blueprint config - request: \n{json_config_map}')
+    logging.info(f'Update blueprint config - request: \n{json_config_map}')
 
     resp = http_client.patch(url = blueprint_url, data=json_config_map)
     # Error handling
     resp.raise_for_status()
 
     # print(f'Update blueprint config {cloudendure_blueprint_id} successful - status {resp.status_code} {resp.reason}\n')
-    logging.info(f'Update blueprint config {cloudendure_blueprint_id} successful - status {resp.status_code} {resp.reason}\n')
+    logging.warning(f'Update blueprint config {cloudendure_blueprint_id} successful - status {resp.status_code} {resp.reason}\n')
 
 
 def get_ec2_instance_sg_and_subnet(ec2_client, ec2_id, aws_source_region, aws_target_region):
