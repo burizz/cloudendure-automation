@@ -11,7 +11,7 @@ Script arguments:
  Cloudendure API Key: --cloudEndureApiKey (optional)  
  Script Log Level --logLevel (optional)  
 
-AWS Account name needs to existing in Cloudendure with the same name
+AWS Account name needs to existing in Cloudendure with the same name  
 Example :
 ```
 python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1
