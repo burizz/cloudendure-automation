@@ -13,7 +13,7 @@ Script arguments:
 
 AWS Account name needs to existing in Cloudendure with the same name  
 Example :
-```
+```shell
 python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1
 ```
 
