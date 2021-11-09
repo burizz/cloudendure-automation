@@ -18,17 +18,17 @@ python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSo
 ```
 
 Example with enabled debug Log Level
-```
+```shell
 python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1 --logLevel debug
 ```
 
 Example with different Cloudendure API Key
-```
+```shell
 python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1 --cloudEndureApiKey "9F1A-C693-6F14-0E7C-F296-C4BE-5CF5-249A-017E-D864-B9B1-2BD6-5693-6A0F-622D-E7E2"
 ```
 
 By default AWS credentials are taken from environment variables. Profile can be provided and used instead
 Example with different AWS profile
-```
+```shell
 python cloudendure-automation.py --cloudEndureProjectName ecint-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1 --awsProfile ecint-non-prod
 ```
