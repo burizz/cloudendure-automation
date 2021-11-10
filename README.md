@@ -30,5 +30,5 @@ python cloudendure-automation.py --cloudEndureProjectName test-non-prod --awsSou
 By default AWS credentials are taken from environment variables. Profile can be provided and used instead
 Example with different AWS profile
 ```shell
-python cloudendure-automation.py --cloudEndureProjectName test-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1 --awsProfile ecint-non-prod
+python cloudendure-automation.py --cloudEndureProjectName test-non-prod --awsSourceRegion eu-west-1 --awsTargetRegion eu-central-1 --awsProfile test-non-prod
 ```
